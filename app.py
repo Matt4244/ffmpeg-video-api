@@ -35,22 +35,30 @@ def render():
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        # Formater le texte et calculer la hauteur du fond
+        # Formater le texte
         wrapped_text = wrap_text(raw_text)
         lines = wrapped_text.count('\n') + 1
-        box_height = 40 + lines * 48  # 48 px par ligne
+        box_height = 40 + lines * 48  # 48 px par ligne + marge haute
 
-        # Centrer verticalement le texte dans le fond coloré (calcul manuel)
-        text_y = f"h-{box_height}+{(box_height - 36 * lines) // 2}"
+        # Extraire la hauteur réelle de la vidéo
+        probe = ffmpeg.probe(input_path)
+        video_streams = [s for s in probe['streams'] if s['codec_type'] == 'video']
+        video_height = int(video_streams[0]['height'])
 
-        # Commande FFmpeg
+        # Calculer la position verticale du texte (centré dans la boîte)
+        text_y = video_height - box_height + (box_height - 36 * lines) // 2
+
+        # Chaîne de filtres FFmpeg
+        filter_str = (
+            f"drawbox=x=0:y=ih-{box_height}:w=iw:h={box_height}:color=#C7A15C@1:t=fill,"
+            f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
+            f"fontcolor=white:fontsize=36:x=(w-text_w)/2:y={text_y}"
+        )
+
+        # Traitement FFmpeg
         ffmpeg.input(input_path).output(
             output_path,
-            vf=(
-                f"drawbox=x=0:y=ih-{box_height}:w=iw:h={box_height}:color=#C7A15C@1:t=fill,"
-                f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
-                f"fontcolor=white:fontsize=36:x=(w-text_w)/2:y={text_y}"
-            ),
+            vf=filter_str,
             vcodec='libx264',
             acodec='copy',
             movflags='+faststart'
@@ -59,7 +67,7 @@ def render():
         return send_file(output_path, mimetype='video/mp4')
 
     except Exception as e:
-        print("Error during processing:", e)
+        print("Error:", e)
         return {"error": str(e)}, 500
 
 if __name__ == "__main__":
