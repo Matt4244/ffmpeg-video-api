@@ -42,7 +42,7 @@ def render():
             "ffmpeg", "-y", "-i", input_path,
             "-vf", f"drawbox=x=0:y=ih-160:w=iw:h=100:color=#C7A15C@1:t=fill,"
                    f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
-                   "fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-160+(100-text_h)/2-ascent",
+                   "fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-160+(100-text_h)/2-10",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
             "-c:a", "aac", "-b:a", "128k",  # encoder aussi l'audio proprement
             output_path
