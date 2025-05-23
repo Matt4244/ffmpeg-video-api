@@ -2,12 +2,12 @@ from flask import Flask, request, send_file
 import requests
 import uuid
 import os
-import ffmpeg
+import subprocess
 
 app = Flask(__name__)
 
 OUTPUT_DIR = "output"
-FONT_PATH = "./Poppins-Bold.ttf"  # Assure-toi que le fichier est bien à la racine
+FONT_PATH = "./Poppins-Bold.ttf"  # Assure-toi que ce fichier est bien présent
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -37,14 +37,18 @@ def render():
         # Formater le texte
         wrapped_text = wrap_text(raw_text, max_chars=30)
 
-        # Appliquer le filtre avec drawbox et drawtext
-        ffmpeg.input(input_path).output(
-            output_path,
-            vf=f"drawbox=x=0:y=ih-160:w=iw:h=100:color=#C7A15C@1:t=fill,"
-               f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
-               f"fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-125",
-            codec='copy'
-        ).run()
+        # Commande FFmpeg mise à jour (avec encodage libx264)
+        cmd = [
+            "ffmpeg", "-i", input_path,
+            "-vf", f"drawbox=x=0:y=ih-160:w=iw:h=100:color=#C7A15C@1:t=fill,"
+                   f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
+                   "fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-125",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-c:a", "copy",
+            output_path
+        ]
+
+        subprocess.run(cmd, check=True)
 
         return send_file(output_path, mimetype='video/mp4')
 
