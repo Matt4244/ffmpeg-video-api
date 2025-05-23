@@ -2,17 +2,19 @@ from flask import Flask, request, send_file
 import requests
 import uuid
 import os
-import subprocess
+import ffmpeg
+import textwrap
 
 app = Flask(__name__)
 
 OUTPUT_DIR = "output"
-FONT_PATH = "./Poppins-Bold.ttf"
+FONT_PATH = "./Poppins-Bold.ttf"  # Assure-toi que ce fichier existe bien ici
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def wrap_text(text, max_chars=30):
-    return '\n'.join([text[i:i+max_chars] for i in range(0, len(text), max_chars)])
+def wrap_text(text, max_width=28):
+    # Ne coupe pas les mots
+    return '\n'.join(textwrap.wrap(text, width=max_width, break_long_words=False))
 
 @app.route("/render", methods=["POST"])
 def render():
@@ -34,21 +36,23 @@ def render():
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        # Préparer le texte
-        wrapped_text = wrap_text(raw_text, max_chars=30)
+        # Formater le texte et calculer la hauteur du fond
+        wrapped_text = wrap_text(raw_text)
+        lines = wrapped_text.count('\n') + 1
+        box_height = 40 + lines * 48  # 48 px par ligne + marge haute
 
-        # Appliquer les filtres avec réencodage (NE PAS utiliser codec copy ici)
-        cmd = [
-            "ffmpeg", "-y", "-i", input_path,
-            "-vf", f"drawbox=x=0:y=ih-160:w=iw:h=100:color=#C7A15C@1:t=fill,"
-                   f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
-                   "fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-160+(100-text_h)/2-15",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "128k",  # encoder aussi l'audio proprement
-            output_path
-        ]
-
-        subprocess.run(cmd, check=True)
+        # Commande FFmpeg
+        ffmpeg.input(input_path).output(
+            output_path,
+            vf=(
+                f"drawbox=x=0:y=ih-{box_height}:w=iw:h={box_height}:color=#C7A15C@1:t=fill,"
+                f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
+                f"fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-{box_height}+((box_height-text_h)/2)"
+            ),
+            vcodec='libx264',
+            acodec='copy',
+            movflags='+faststart'
+        ).run(overwrite_output=True)
 
         return send_file(output_path, mimetype='video/mp4')
 
