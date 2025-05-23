@@ -7,7 +7,7 @@ import subprocess
 app = Flask(__name__)
 
 OUTPUT_DIR = "output"
-FONT_PATH = "./Poppins-Bold.ttf"  # Assure-toi que ce fichier est bien présent
+FONT_PATH = "./Poppins-Bold.ttf"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -34,17 +34,17 @@ def render():
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        # Formater le texte
+        # Préparer le texte
         wrapped_text = wrap_text(raw_text, max_chars=30)
 
-        # Commande FFmpeg mise à jour (avec encodage libx264)
+        # Appliquer les filtres avec réencodage (NE PAS utiliser codec copy ici)
         cmd = [
-            "ffmpeg", "-i", input_path,
+            "ffmpeg", "-y", "-i", input_path,
             "-vf", f"drawbox=x=0:y=ih-160:w=iw:h=100:color=#C7A15C@1:t=fill,"
                    f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
                    "fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-125",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-            "-c:a", "copy",
+            "-c:a", "aac", "-b:a", "128k",  # encoder aussi l'audio proprement
             output_path
         ]
 
