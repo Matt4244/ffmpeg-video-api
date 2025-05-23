@@ -8,16 +8,12 @@ import textwrap
 app = Flask(__name__)
 
 OUTPUT_DIR = "output"
-FONT_PATH = "./Poppins-Bold.ttf"  # Assure-toi que ce fichier est bien présent
+FONT_PATH = "./Poppins-Bold.ttf"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def wrap_text(text, max_width=28):
     return '\n'.join(textwrap.wrap(text, width=max_width, break_long_words=False))
-
-@app.route("/", methods=["GET"])
-def index():
-    return "✅ API is running on Render!"
 
 @app.route("/render", methods=["POST"])
 def render():
@@ -42,27 +38,29 @@ def render():
         # Formater le texte et calculer la hauteur du fond
         wrapped_text = wrap_text(raw_text)
         lines = wrapped_text.count('\n') + 1
-        box_height = 40 + lines * 48
+        box_height = 40 + lines * 48  # 48 px par ligne
 
-        # Traitement FFmpeg
-        (
-            ffmpeg
-            .input(input_path)
-            .output(
-                output_path,
-                vf=(
-                    f"drawbox=x=0:y=ih-{box_height}:w=iw:h={box_height}:color=#C7A15C@1:t=fill,"
-                    f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
-                    f"fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-{box_height}+((box_height-text_h)/2)"
-                ),
-                vcodec='libx264',
-                acodec='copy',
-                movflags='+faststart'
-            )
-            .run(overwrite_output=True)
-        )
+        # Centrer verticalement le texte dans le fond coloré (calcul manuel)
+        text_y = f"h-{box_height}+{(box_height - 36 * lines) // 2}"
+
+        # Commande FFmpeg
+        ffmpeg.input(input_path).output(
+            output_path,
+            vf=(
+                f"drawbox=x=0:y=ih-{box_height}:w=iw:h={box_height}:color=#C7A15C@1:t=fill,"
+                f"drawtext=fontfile={FONT_PATH}:text='{wrapped_text}':"
+                f"fontcolor=white:fontsize=36:x=(w-text_w)/2:y={text_y}"
+            ),
+            vcodec='libx264',
+            acodec='copy',
+            movflags='+faststart'
+        ).run(overwrite_output=True)
 
         return send_file(output_path, mimetype='video/mp4')
 
     except Exception as e:
+        print("Error during processing:", e)
         return {"error": str(e)}, 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
